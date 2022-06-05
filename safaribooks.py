@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 # coding: utf-8
+from ast import arg
+from http import cookies
 import re
 import os
 import sys
@@ -18,6 +20,9 @@ from multiprocessing import Process, Queue, Value
 from urllib.parse import urljoin, urlparse, parse_qs, quote_plus
 
 
+COOKIES="orm-rt=8633ebc994ef4c2caea6e24e7b9ec9aa; orm-jwt=eyJhbGciOiAiUlMyNTYiLCAia2lkIjogImI1ZjliMGU1YzM1ZDRiY2NjYjY1YzZkOGQxYzQ2MWI5In0.eyJhY2N0cyI6IFsiZDU4MzA1NDgtYzc5ZS00YjkxLWEwMWItNWEyNTU0ZGEyMGUxIl0sICJlaWRzIjogeyJleGFjdHRhcmdldCI6ICJwbGF0Zm9ybV9wcm9kX2ZhZjUzYjMzLWY3NzItNGQ0Yi05YWFmLWY3MjliM2E3MDBhYSIsICJoZXJvbiI6ICJmYWY1M2IzMy1mNzcyLTRkNGItOWFhZi1mNzI5YjNhNzAwYWEifSwgImVudiI6ICJwcm9kdWN0aW9uIiwgImV4cCI6IDE2NTQ0MTIzNjYsICJpbmRpdmlkdWFsIjogZmFsc2UsICJwZXJtcyI6IHsiYXBpZGMiOiAidiIsICJjbmZyYyI6ICJ2IiwgImNzc3RkIjogInYiLCAiZXB1YnMiOiAidiIsICJscnB0aCI6ICJ2IiwgIm9yaW9sIjogInYiLCAicGx5bHMiOiAiY2V2IiwgInVzYWdlIjogImMiLCAidXNycGYiOiAidiIsICJ2aWRlbyI6ICJ2In0sICJzdWIiOiAiZmFmNTNiMzMtZjc3Mi00ZDRiLTlhYWYtZjcyOWIzYTcwMGFhIn0.aCL6hWCsb-urllSWTmtqKDg6Vbd--j96Xe-AlTb7I3DUPM9xzkM85PZ529g8GOCtfNKBUw6GnLo79DrAoHSX-oTjSULeCc0h_Wm2YVYngyF4S7TXZ308m-uVS6ds9R6UiT9TVN80JC2hd8dXPOJRy_UjxtMJQpoIMOama_fBjUU"
+
+
 PATH = os.path.dirname(os.path.realpath(__file__))
 COOKIES_FILE = os.path.join(PATH, "cookies.json")
 
@@ -34,6 +39,12 @@ PROFILE_URL = SAFARI_BASE_URL + "/profile/"
 # DEBUG
 USE_PROXY = False
 PROXIES = {"https": "https://127.0.0.1:8080"}
+
+
+
+def convert_cookies_to_dict(cookies):
+    cookies = dict([l.split("=", 1) for l in cookies.split("; ")])
+    return cookies
 
 
 class Display:
@@ -304,8 +315,9 @@ class SafariBooks:
         "Referer": LOGIN_ENTRY_URL,
         "Upgrade-Insecure-Requests": "1",
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
-                      "Chrome/90.0.4430.212 Safari/537.36"
+                      "Chrome/102.0.5005.63 Safari/537.36 Edg/102.0.1245.30"
     }
+
 
     COOKIE_FLOAT_MAX_AGE_PATTERN = re.compile(r'(max-age=\d*\.\d*)', re.IGNORECASE)
 
@@ -332,7 +344,8 @@ class SafariBooks:
 
         else:
             self.display.info("Logging into Safari Books Online...", state=True)
-            self.do_login(*args.cred)
+            # self.do_login(*args.cred)
+            self.do_login_t()
             if not args.no_cookies:
                 json.dump(self.session.cookies.get_dict(), open(COOKIES_FILE, 'w'))
 
@@ -422,6 +435,7 @@ class SafariBooks:
 
     def requests_provider(self, url, is_post=False, data=None, perform_redirect=True, **kwargs):
         try:
+            # TODO
             response = getattr(self.session, "post" if is_post else "get")(
                 url,
                 data=data,
@@ -474,7 +488,7 @@ class SafariBooks:
             self.display.exit("Login: unable to complete login on Safari Books Online. Try again...")
 
         redirect_uri = API_ORIGIN_URL + quote_plus(next_parameter)
-
+        # TODO 登陆点
         response = self.requests_provider(
             self.LOGIN_URL,
             is_post=True,
@@ -514,6 +528,48 @@ class SafariBooks:
         response = self.requests_provider(self.jwt["redirect_uri"])
         if response == 0:
             self.display.exit("Login: unable to reach Safari Books Online. Try again...")
+
+    def do_login_t(self):
+        ck=convert_cookies_to_dict(COOKIES)
+        # TODO 登陆点
+        self.session.cookies.update(ck)
+        # response = self.requests_provider(
+        #     # self.LOGIN_URL,
+        #     "https://learning.oreilly.com/profile/",
+        #     # is_post=True,
+        #     cookies=ck
+        #     # perform_redirect=False
+        # )
+
+        # if response == 0:
+        #     self.display.exit("Login: unable to perform auth to Safari Books Online.\n    Try again...")
+
+        # if response.status_code != 200:  # TODO To be reviewed
+        #     try:
+        #         error_page = html.fromstring(response.text)
+        #         errors_message = error_page.xpath("//ul[@class='errorlist']//li/text()")
+        #         recaptcha = error_page.xpath("//div[@class='g-recaptcha']")
+        #         messages = (["    `%s`" % error for error in errors_message
+        #                      if "password" in error or "email" in error] if len(errors_message) else []) + \
+        #                    (["    `ReCaptcha required (wait or do logout from the website).`"] if len(
+        #                        recaptcha) else [])
+        #         self.display.exit(
+        #             "Login: unable to perform auth login to Safari Books Online.\n" + self.display.SH_YELLOW +
+        #             "[*]" + self.display.SH_DEFAULT + " Details:\n" + "%s" % "\n".join(
+        #                 messages if len(messages) else ["    Unexpected error!"])
+        #         )
+        #     except (html.etree.ParseError, html.etree.ParserError) as parsing_error:
+        #         self.display.error(parsing_error)
+        #         self.display.exit(
+        #             "Login: your login went wrong and it encountered in an error"
+        #             " trying to parse the login details of Safari Books Online. Try again..."
+        #         )
+
+        # self.jwt = response.json()  # TODO: save JWT Tokens and use the refresh_token to restore user session
+        # response = self.requests_provider(self.jwt["redirect_uri"])
+        # if response == 0:
+        #     self.display.exit("Login: unable to reach Safari Books Online. Try again...")
+
 
     def check_login(self):
         response = self.requests_provider(PROFILE_URL, perform_redirect=False)
@@ -1119,6 +1175,7 @@ if __name__ == "__main__":
         if args_parsed.no_cookies:
             arguments.error("invalid option: `--no-cookies` is valid only if you use the `--cred` option")
 
+    print(args_parsed)
     SafariBooks(args_parsed)
     # Hint: do you want to download more then one book once, initialized more than one instance of `SafariBooks`...
     sys.exit(0)
